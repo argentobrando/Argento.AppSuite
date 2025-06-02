@@ -1,0 +1,23 @@
+﻿@namespace Shared.UI.Layouts
+
+@inherits LayoutComponentBase
+
+@code {
+    private bool isNavOpen = false; // Start CLOSED
+
+    private void ToggleNav()
+    {
+        isNavOpen = !isNavOpen;
+    }
+}
+
+<div class="app-container">
+    <aside class="side-nav @(isNavOpen ? "open" : "closed")">
+        <Shared.UI.Nav.NavMenu />
+    </aside>
+
+    <main class="main-content">
+        <button class="nav-toggle" @onclick="ToggleNav">☰ Menu</button>
+        @Body
+    </main>
+</div>

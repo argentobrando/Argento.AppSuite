@@ -1,34 +1,42 @@
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Shared.Clients;
+using ArgentoWebApp.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorComponents()
-	.AddInteractiveServerComponents(); 
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
 
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+	.AddCookie(options =>
+	{
+		options.Cookie.HttpOnly = true;
+		options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+		options.Cookie.SameSite = SameSiteMode.Strict;
+		options.LoginPath = "/login";
+	});
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddScoped<JwtSessionService>();
+
+var authServiceUrl = builder.Configuration["AuthService:BaseUrl"];
 
 builder.Services.AddHttpClient<AuthServiceClient>(client =>
 {
-	client.BaseAddress = new Uri("https://localhost:5007"); // AuthService API
-	client.DefaultRequestHeaders.Accept.Clear();
-	client.DefaultRequestHeaders.Accept.Add(new("application/json"));
-
+	client.BaseAddress = new Uri(authServiceUrl);
 });
 
-// Add Blazor built-in auth
-builder.Services.AddAuthorizationCore();
-builder.Services.AddScoped<AuthenticationStateProvider, YourAuthStateProvider>(); // custom provider if needed
-
 var app = builder.Build();
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseAntiforgery();
-
-app.MapRazorComponents<App>()
-	.AddInteractiveServerRenderMode();
+app.MapRazorPages();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
 
 app.Run();

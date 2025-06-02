@@ -1,51 +1,79 @@
-﻿using AuthService.API.Data;
-using AuthService.API.Models;
-using AuthService.API.Services;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using AuthService.API.Models;
+using AuthService.API.Models.DTO;
 
 namespace AuthService.API.Controllers
 {
-	[Route("api/[controller]")]
 	[ApiController]
+	[Route("[controller]")]
 	public class AuthController : ControllerBase
 	{
-		private readonly AppDbContext _context;
-		private readonly TokenService _tokenService;
+		private readonly UserManager<ApplicationUser> _userManager;
+		private readonly SignInManager<ApplicationUser> _signInManager;
+		private readonly IConfiguration _configuration;
 
-		public AuthController(AppDbContext context, TokenService tokenService)
+		public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration)
 		{
-			_context = context;
-			_tokenService = tokenService;
+			_userManager = userManager;
+			_signInManager = signInManager;
+			_configuration = configuration;
 		}
 
-		[HttpGet]
-		public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+		[HttpPost("register")]
+		public async Task<IActionResult> Register(RegisterDto model)
 		{
-			return await _context.Users.ToListAsync();
-		}
+			var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
+			var result = await _userManager.CreateAsync(user, model.Password);
 
-		[HttpPost]
-		public async Task<ActionResult<User>> CreateUser(User user)
-		{
-			_context.Users.Add(user);
-			await _context.SaveChangesAsync();
-			return CreatedAtAction(nameof(GetUsers), new { id = user.Id }, user);
+			if (result.Succeeded)
+			{
+				return Ok();
+			}
+
+			return BadRequest(result.Errors);
 		}
 
 		[HttpPost("login")]
-		public IActionResult Login([FromBody] UserLogin login)
+		public async Task<IActionResult> Login(LoginDto model)
 		{
-			var user = _context.Users.SingleOrDefault(u => u.Username == login.Username);
+			var user = await _userManager.FindByEmailAsync(model.Email);
+			if (user == null) return Unauthorized();
 
-			if (user != null && BCrypt.Net.BCrypt.Verify(login.Password, user.PasswordHash))
+			var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
+			if (!result.Succeeded) return Unauthorized();
+
+			var claims = new[]
 			{
-				var token = _tokenService.GenerateToken(user.Username);
-				return Ok(new { token });
-			}
+				new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+				new Claim(JwtRegisteredClaimNames.Email, user.Email)
+			};
 
-			return Unauthorized();
+			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+			var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+			var token = new JwtSecurityToken(
+				issuer: _configuration["Jwt:Issuer"],
+				audience: _configuration["Jwt:Audience"],
+				claims: claims,
+				expires: DateTime.Now.AddMinutes(60),
+				signingCredentials: creds);
+
+			return Ok(new AuthResponseDto
+			{
+				Token = new JwtSecurityTokenHandler().WriteToken(token)
+			});
+		}
+
+		[HttpPost("logout")]
+		public async Task<IActionResult> Logout()
+		{
+			await _signInManager.SignOutAsync();
+			return Ok();
 		}
 	}
 }
