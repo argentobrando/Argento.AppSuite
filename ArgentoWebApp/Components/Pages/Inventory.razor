@@ -1,0 +1,7 @@
+﻿@page "/inventory"
+@attribute [Authorize]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using Shared.UI.Components
+@using Microsoft.AspNetCore.Authorization
+
+<ProductList />

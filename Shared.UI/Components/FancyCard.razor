@@ -1,0 +1,9 @@
+﻿<div class="card p-3 mb-3">
+    <h5 class="card-title">@Title</h5>
+    <p class="card-text">@ChildContent</p>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Default Title";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
