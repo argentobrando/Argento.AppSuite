@@ -1,24 +1,29 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using AuthService.API.Data;
-using AuthService.API.Models;
+using AuthService.API.Settings;
+using Microsoft.EntityFrameworkCore;
+using AuthService.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// PostgreSQL
-builder.Services.AddDbContext<AuthDbContext>(options =>
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddDbContext<AuthService.API.Data.AuthDbContext>(options =>
 	options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Identity
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
-	.AddEntityFrameworkStores<AuthDbContext>()
-	.AddDefaultTokenProviders();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthUserService>();
 
-// JWT
-var jwtKey = builder.Configuration["Jwt:Key"];
+// Load JwtSettings from config
+var jwtSettingsSection = builder.Configuration.GetSection("JwtSettings");
+builder.Services.Configure<JwtSettings>(jwtSettingsSection);
+
+var jwtSettings = jwtSettingsSection.Get<JwtSettings>();
+var key = Encoding.UTF8.GetBytes(jwtSettings.SecretKey);
+
 builder.Services.AddAuthentication(options =>
 {
 	options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -32,28 +37,27 @@ builder.Services.AddAuthentication(options =>
 		ValidateAudience = true,
 		ValidateLifetime = true,
 		ValidateIssuerSigningKey = true,
-		ValidIssuer = builder.Configuration["Jwt:Issuer"],
-		ValidAudience = builder.Configuration["Jwt:Audience"],
-		IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+		ValidIssuer = jwtSettings.Issuer,
+		ValidAudience = jwtSettings.Audience,
+		IssuerSigningKey = new SymmetricSecurityKey(key)
 	};
 });
 
-// Cookie for Blazor Server
-builder.Services.ConfigureApplicationCookie(options =>
-{
-	options.Cookie.HttpOnly = true;
-	options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-	options.Cookie.SameSite = SameSiteMode.Strict;
-	options.ExpireTimeSpan = TimeSpan.FromHours(1);
-	options.LoginPath = "/login";
-});
+builder.Services.AddAuthorization();
 
-builder.Services.AddControllers();
 var app = builder.Build();
 
-app.UseRouting();
+if (app.Environment.IsDevelopment())
+{
+	app.UseSwagger();
+	app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();

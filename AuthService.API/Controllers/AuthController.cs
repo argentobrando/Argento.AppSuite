@@ -1,79 +1,102 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
+using AuthService.API.Services;
+using Microsoft.Extensions.Options;
+using AuthService.API.Settings;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using AuthService.API.Models;
+using System.Security.Claims;
 using AuthService.API.Models.DTO;
 
 namespace AuthService.API.Controllers
 {
 	[ApiController]
-	[Route("[controller]")]
+	[Route("api/[controller]")]
 	public class AuthController : ControllerBase
 	{
-		private readonly UserManager<ApplicationUser> _userManager;
-		private readonly SignInManager<ApplicationUser> _signInManager;
-		private readonly IConfiguration _configuration;
+		private readonly IAuthService _authService;
+		private readonly JwtSettings _jwtSettings;
 
-		public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration)
+		public AuthController(IAuthService authService, IOptions<JwtSettings> jwtSettings)
 		{
-			_userManager = userManager;
-			_signInManager = signInManager;
-			_configuration = configuration;
-		}
-
-		[HttpPost("register")]
-		public async Task<IActionResult> Register(RegisterDto model)
-		{
-			var user = new ApplicationUser { UserName = model.Email, Email = model.Email };
-			var result = await _userManager.CreateAsync(user, model.Password);
-
-			if (result.Succeeded)
-			{
-				return Ok();
-			}
-
-			return BadRequest(result.Errors);
+			_authService = authService;
+			_jwtSettings = jwtSettings.Value;
 		}
 
 		[HttpPost("login")]
-		public async Task<IActionResult> Login(LoginDto model)
+		public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
 		{
-			var user = await _userManager.FindByEmailAsync(model.Email);
-			if (user == null) return Unauthorized();
+			bool valid = await _authService.ValidateCredentialsAsync(request.Username, request.Password);
 
-			var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, false);
-			if (!result.Succeeded) return Unauthorized();
-
-			var claims = new[]
+			if (valid)
 			{
-				new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-				new Claim(JwtRegisteredClaimNames.Email, user.Email)
-			};
+				// Issue JWT
+				var claims = new List<Claim>
+				{
+					new Claim(ClaimTypes.Name, request.Username),
+					new Claim(ClaimTypes.Role, "User")
+				};
 
-			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-			var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+				var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
+				var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-			var token = new JwtSecurityToken(
-				issuer: _configuration["Jwt:Issuer"],
-				audience: _configuration["Jwt:Audience"],
-				claims: claims,
-				expires: DateTime.Now.AddMinutes(60),
-				signingCredentials: creds);
+				var token = new JwtSecurityToken(
+					issuer: _jwtSettings.Issuer,
+					audience: _jwtSettings.Audience,
+					claims: claims,
+					expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
+					signingCredentials: creds
+				);
 
-			return Ok(new AuthResponseDto
+				var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+				return Ok(new { token = tokenString });
+			}
+			else
 			{
-				Token = new JwtSecurityTokenHandler().WriteToken(token)
-			});
+				return Unauthorized();
+			}
 		}
 
-		[HttpPost("logout")]
-		public async Task<IActionResult> Logout()
+		[HttpPost("register")]
+		public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
 		{
-			await _signInManager.SignOutAsync();
-			return Ok();
+			bool success = await _authService.RegisterUserAsync(request.Username, request.Email, request.Password);
+
+			if (success)
+			{
+				return Ok();
+			}
+			else
+			{
+				return Conflict("User already exists.");
+			}
+		}
+
+		[Authorize]
+		[HttpGet("userinfo")]
+		public async Task<ActionResult<UserInfoDto>> UserInfo([FromServices] IUserService userService)
+		{
+			var username = User.Identity?.Name;
+
+			if (string.IsNullOrEmpty(username))
+				return Unauthorized();
+
+			var user = await userService.GetUserByUsernameAsync(username);
+
+			if (user == null)
+				return Unauthorized();
+
+			return new UserInfoDto
+			{
+				Username = user.Username,
+				Email = user.Email,
+				Roles = User.Claims
+					.Where(c => c.Type == ClaimTypes.Role)
+					.Select(c => c.Value)
+					.ToArray()
+			};
 		}
 	}
 }

@@ -1,18 +1,28 @@
-﻿@namespace Shared.UI.Nav
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Routing
 
-<nav>
-    <ul class="nav-list">
-        <li>
-            <NavLink href="/" class="app-nav-link" activeClass="active">Home</NavLink>
-        </li>
-        <li>
-            <NavLink href="/dashboard" class="app-nav-link" activeClass="active">Dashboard</NavLink>
-        </li>
-        <li>
-            <NavLink href="/reports" class="app-nav-link" activeClass="active">Reports</NavLink>
-        </li>
-        <li>
-            <NavLink href="/settings" class="app-nav-link" activeClass="active">Settings</NavLink>
-        </li>
-    </ul>
+<nav class="nav flex-column p-3">
+    <h5 class="text-white mb-4">Menu</h5>
+
+    <NavLink href="/" class="nav-link text-white" Match="NavLinkMatch.All">
+        Dashboard
+    </NavLink>
+
+    <NavLink href="/reports" class="nav-link text-white">
+        Reports
+    </NavLink>
+
+    <NavLink href="/settings" class="nav-link text-white">
+        Settings
+    </NavLink>
+
+    <hr />
+
+    <NavLink href="/login" class="nav-link text-white">
+        Login
+    </NavLink>
+
+    <NavLink href="/register" class="nav-link text-white">
+        Register
+    </NavLink>
 </nav>

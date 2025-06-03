@@ -1,41 +1,35 @@
-using ArgentoWebApp.Services;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Server;
+using Shared.Clients;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-	.AddCookie(options =>
-	{
-		options.Cookie.HttpOnly = true;
-		options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-		options.Cookie.SameSite = SameSiteMode.Strict;
-		options.LoginPath = "/login";
-	});
-
-builder.Services.AddAuthorization();
-
-builder.Services.AddScoped<JwtSessionService>();
-
-var authServiceUrl = builder.Configuration["AuthService:BaseUrl"];
-
+// Register AuthServiceClient — required for Login.razor
 builder.Services.AddHttpClient<AuthServiceClient>(client =>
 {
-	client.BaseAddress = new Uri(authServiceUrl);
+	client.BaseAddress = new Uri(builder.Configuration["AuthService:BaseUrl"]);
 });
+
+// Optional: if using authentication state
+builder.Services.AddScoped<AuthenticationStateProvider, ServerAuthenticationStateProvider>();
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+	app.UseExceptionHandler("/Error");
+	app.UseHsts();
+}
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseRouting();
 
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapRazorPages();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 

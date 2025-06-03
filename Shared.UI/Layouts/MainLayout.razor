@@ -1,23 +1,18 @@
-﻿@namespace Shared.UI.Layouts
+﻿@inherits LayoutComponentBase
+@using Shared.UI.Nav
 
-@inherits LayoutComponentBase
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
 
-@code {
-    private bool isNavOpen = false; // Start CLOSED
+    <main>
+        <div class="top-row px-4">
+            <h1>Argento AppSuite</h1>
+        </div>
 
-    private void ToggleNav()
-    {
-        isNavOpen = !isNavOpen;
-    }
-}
-
-<div class="app-container">
-    <aside class="side-nav @(isNavOpen ? "open" : "closed")">
-        <Shared.UI.Nav.NavMenu />
-    </aside>
-
-    <main class="main-content">
-        <button class="nav-toggle" @onclick="ToggleNav">☰ Menu</button>
-        @Body
+        <article class="content px-4">
+            @Body
+        </article>
     </main>
 </div>

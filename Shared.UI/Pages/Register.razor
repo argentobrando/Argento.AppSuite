@@ -1,0 +1,60 @@
+﻿@page "/register"
+@using Shared.Clients
+@using Shared.Clients.Data.DTO
+@inject AuthServiceClient AuthClient
+@inject NavigationManager Nav
+
+<h3>Register</h3>
+
+<EditForm Model="@registerModel" OnValidSubmit="HandleRegister">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label>Username:</label>
+        <InputText @bind-Value="registerModel.Username" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Email:</label>
+        <InputText @bind-Value="registerModel.Email" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Password:</label>
+        <InputText @bind-Value="registerModel.Password" type="password" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-success">Register</button>
+</EditForm>
+
+@if (error != null)
+{
+    <p class="text-danger mt-3">@error</p>
+}
+
+@code {
+    private RegisterRequestDto registerModel = new();
+    private string error;
+
+    private async Task HandleRegister()
+    {
+        try
+        {
+            bool success = await AuthClient.RegisterAsync(registerModel);
+
+            if (success)
+            {
+                Nav.NavigateTo("/login");
+            }
+            else
+            {
+                error = "Registration failed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Error: {ex.Message}";
+        }
+    }
+}

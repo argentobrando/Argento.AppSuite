@@ -1,0 +1,56 @@
+﻿@page "/login"
+
+@using Shared.Clients
+@using Shared.Clients.Data.DTO
+@inject AuthServiceClient AuthClient
+@inject NavigationManager Nav
+
+<h3>Login</h3>
+
+<EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label>Username:</label>
+        <InputText @bind-Value="loginModel.Username" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Password:</label>
+        <InputText @bind-Value="loginModel.Password" type="password" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Login</button>
+</EditForm>
+
+@if (error != null)
+{
+    <p class="text-danger mt-3">@error</p>
+}
+
+@code {
+    private LoginRequestDto loginModel = new();
+    private string error;
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            bool success = await AuthClient.LoginAsync(loginModel);
+
+            if (success)
+            {
+                Nav.NavigateTo("/");
+            }
+            else
+            {
+                error = "Invalid login.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Error: {ex.Message}";
+        }
+    }
+}
