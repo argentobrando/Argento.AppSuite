@@ -1,0 +1,10 @@
+﻿@typeparam T
+
+<InputText @bind="Value" class="form-control" />
+@code {
+    [Parameter]
+    public T Value { get; set; }
+
+    [Parameter]
+    public EventCallback<T> ValueChanged { get; set; }
+}
